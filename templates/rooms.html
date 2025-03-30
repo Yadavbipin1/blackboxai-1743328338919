@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block hero %}
+<div class="hero-section">
+    <div class="hero-overlay">
+        <div class="hero-text">
+            <h1 class="display-4">Room Management</h1>
+            <p class="lead">Manage hostel rooms and occupancy</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Add/Edit Room Form -->
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">{% if room_to_edit %}Edit{% else %}Add New{% endif %} Room</h5>
+                <form method="POST" action="{{ url_for('rooms') }}">
+                    {% if room_to_edit %}
+                    <input type="hidden" name="room_id" value="{{ room_to_edit.id }}">
+                    {% endif %}
+                    
+                    <div class="mb-3">
+                        <label for="room_number" class="form-label">Room Number</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="room_number" 
+                               name="room_number" 
+                               value="{{ room_to_edit.room_number if room_to_edit else '' }}"
+                               required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="room_type" class="form-label">Room Type</label>
+                        <select class="form-select" id="room_type" name="room_type" required>
+                            <option value="">Select room type</option>
+                            <option value="1 seater" 
+                                    {% if room_to_edit and room_to_edit.room_type == '1 seater' %}selected{% endif %}>
+                                1 Seater (₹12,000/month)
+                            </option>
+                            <option value="3 seater" 
+                                    {% if room_to_edit and room_to_edit.room_type == '3 seater' %}selected{% endif %}>
+                                3 Seater (₹10,000/month)
+                            </option>
+                            <option value="4 seater" 
+                                    {% if room_to_edit and room_to_edit.room_type == '4 seater' %}selected{% endif %}>
+                                4 Seater (₹9,000/month)
+                            </option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" 
+                               class="form-check-input" 
+                               id="occupancy" 
+                               name="occupancy" 
+                               {% if room_to_edit and room_to_edit.occupancy %}checked{% endif %}>
+                        <label class="form-check-label" for="occupancy">Currently Occupied</label>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-save me-2"></i>
+                        {% if room_to_edit %}Update{% else %}Add{% endif %} Room
+                    </button>
+                    
+                    {% if room_to_edit %}
+                    <a href="{{ url_for('rooms') }}" class="btn btn-secondary w-100 mt-2">
+                        <i class="fas fa-plus me-2"></i>Add New Room Instead
+                    </a>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+        
+        <!-- Room Type Information Card -->
+        <div class="card mt-4">
+            <div class="card-body">
+                <h5 class="card-title">Room Types & Rates</h5>
+                <div class="list-group">
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">1 Seater</h6>
+                            <span class="text-primary">₹12,000/month</span>
+                        </div>
+                        <small class="text-muted">Single occupancy, private room</small>
+                    </div>
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">3 Seater</h6>
+                            <span class="text-primary">₹10,000/month</span>
+                        </div>
+                        <small class="text-muted">Shared room for three people</small>
+                    </div>
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">4 Seater</h6>
+                            <span class="text-primary">₹9,000/month</span>
+                        </div>
+                        <small class="text-muted">Shared room for four people</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Room List -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Room List</h5>
+                
+                <!-- Room Filters -->
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <select class="form-select" id="typeFilter">
+                            <option value="">All Types</option>
+                            <option value="1 seater">1 Seater</option>
+                            <option value="3 seater">3 Seater</option>
+                            <option value="4 seater">4 Seater</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <select class="form-select" id="occupancyFilter">
+                            <option value="">All Status</option>
+                            <option value="occupied">Occupied</option>
+                            <option value="available">Available</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Room Number</th>
+                                <th>Type</th>
+                                <th>Rate/Month</th>
+                                <th>Status</th>
+                                <th>Current Occupant</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for room in rooms %}
+                            <tr data-room-type="{{ room.room_type }}" 
+                                data-occupancy="{{ 'occupied' if room.occupancy else 'available' }}">
+                                <td>{{ room.room_number }}</td>
+                                <td>{{ room.room_type }}</td>
+                                <td>₹{{ "{:,.2f}".format(room.price_per_month) }}</td>
+                                <td>
+                                    {% if room.occupancy %}
+                                    <span class="badge bg-danger">Occupied</span>
+                                    {% else %}
+                                    <span class="badge bg-success">Available</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if room.occupancy and room.guests %}
+                                        {% set current_guest = namespace(found=false, name='') %}
+                                        {% for guest in room.guests %}
+                                            {% if not guest.check_out_date and not current_guest.found %}
+                                                {% set current_guest.found = true %}
+                                                {% set current_guest.name = guest.full_name %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        {% if current_guest.found %}
+                                            {{ current_guest.name }}
+                                        {% else %}
+                                            <span class="text-muted">No guest assigned</span>
+                                        {% endif %}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="{{ url_for('rooms', edit_room_id=room.id) }}" 
+                                           class="btn btn-sm btn-warning" 
+                                           title="Edit Room">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <button type="button" 
+                                                class="btn btn-sm btn-info text-white" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#roomHistoryModal{{ room.id }}"
+                                                title="View History">
+                                            <i class="fas fa-history"></i>
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Room History Modal -->
+                                    <div class="modal fade" id="roomHistoryModal{{ room.id }}" tabindex="-1">
+                                        <div class="modal-dialog modal-lg">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Room History - {{ room.room_number }}</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <div class="table-responsive">
+                                                        <table class="table">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Guest Name</th>
+                                                                    <th>Check-in Date</th>
+                                                                    <th>Check-out Date</th>
+                                                                    <th>Duration</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {% for guest in room.guests %}
+                                                                <tr>
+                                                                    <td>{{ guest.full_name }}</td>
+                                                                    <td>{{ guest.check_in_date.strftime('%Y-%m-%d') }}</td>
+                                                                    <td>
+                                                                        {% if guest.check_out_date %}
+                                                                        {{ guest.check_out_date.strftime('%Y-%m-%d') }}
+                                                                        {% else %}
+                                                                        <span class="badge bg-success">Current</span>
+                                                                        {% endif %}
+                                                                    </td>
+                                                                    <td>
+                                                                        {% set today = now.date() %}
+                                                                        {% set checkin = guest.check_in_date %}
+                                                                        {% if guest.check_out_date %}
+                                                                            {% set checkout = guest.check_out_date %}
+                                                                            {{ (checkout - checkin).days }} days
+                                                                        {% else %}
+                                                                            {{ (today - checkin).days }} days
+                                                                        {% endif %}
+                                                                    </td>
+                                                                </tr>
+                                                                {% endfor %}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Room type filter
+    const typeFilter = document.getElementById('typeFilter');
+    const occupancyFilter = document.getElementById('occupancyFilter');
+    const roomRows = document.querySelectorAll('tbody tr');
+    
+    function filterRooms() {
+        const selectedType = typeFilter.value;
+        const selectedOccupancy = occupancyFilter.value;
+        
+        roomRows.forEach(row => {
+            const roomType = row.dataset.roomType;
+            const occupancy = row.dataset.occupancy;
+            
+            const typeMatch = !selectedType || roomType === selectedType;
+            const occupancyMatch = !selectedOccupancy || occupancy === selectedOccupancy;
+            
+            row.style.display = typeMatch && occupancyMatch ? '' : 'none';
+        });
+    }
+    
+    typeFilter.addEventListener('change', filterRooms);
+    occupancyFilter.addEventListener('change', filterRooms);
+    
+    // Form validation
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function(event) {
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        form.classList.add('was-validated');
+    });
+});
+</script>
+{% endblock %}

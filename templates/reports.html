@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+
+{% block hero %}
+<div class="hero-section">
+    <div class="hero-overlay">
+        <div class="hero-text">
+            <h1 class="display-4">Financial Reports</h1>
+            <p class="lead">View and download financial reports</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Report Filters -->
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('reports') }}" class="row g-3">
+                    <div class="col-md-4">
+                        <label for="month" class="form-label">Month</label>
+                        <select class="form-select" id="month" name="month">
+                            {% for m in range(1, 13) %}
+                            <option value="{{ m }}" {% if month == m %}selected{% endif %}>
+                                {{ m|month_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="year" class="form-label">Year</label>
+                        <select class="form-select" id="year" name="year">
+                            {% for y in range(current_year - 2, current_year + 1) %}
+                            <option value="{{ y }}" {% if year == y %}selected{% endif %}>
+                                {{ y }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-filter me-2"></i>Generate Report
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="col-12 mb-4">
+        <div class="row">
+            <!-- Total Income -->
+            <div class="col-md-4 mb-4">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-0">Total Income</h6>
+                                <h2 class="my-2">₹{{ "{:,.2f}".format(total_income) }}</h2>
+                                <p class="mb-0">From {{ income_data|length }} payments</p>
+                            </div>
+                            <i class="fas fa-money-bill-wave fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Expenses -->
+            <div class="col-md-4 mb-4">
+                <div class="card bg-danger text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-0">Total Expenses</h6>
+                                <h2 class="my-2">₹{{ "{:,.2f}".format(total_expenses) }}</h2>
+                                <p class="mb-0">From {{ expense_data|length }} expenses</p>
+                            </div>
+                            <i class="fas fa-receipt fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Net Balance -->
+            <div class="col-md-4 mb-4">
+                <div class="card {{ 'bg-primary' if net_balance >= 0 else 'bg-danger' }} text-white">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title mb-0">Net Balance</h6>
+                                <h2 class="my-2">₹{{ "{:,.2f}".format(net_balance) }}</h2>
+                                <p class="mb-0">
+                                    {% if net_balance >= 0 %}Profit{% else %}Loss{% endif %}
+                                </p>
+                            </div>
+                            <i class="fas fa-chart-line fa-3x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Financial Overview</h5>
+                <canvas id="financialChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Reports -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="card-title mb-0">Income Details</h5>
+                    <a href="{{ url_for('download_report', filename=pdf_path) }}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-download me-2"></i>Download Report
+                    </a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Guest</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in income_data %}
+                            <tr>
+                                <td>{{ record.date.strftime('%Y-%m-%d') }}</td>
+                                <td>{{ record.guest_name }}</td>
+                                <td>₹{{ "{:,.2f}".format(record.amount) }}</td>
+                                <td>
+                                    <span class="badge {{ 'bg-success' if record.status == 'paid' else 'bg-warning' }}">
+                                        {{ record.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-4">Expense Details</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Category</th>
+                                <th>Description</th>
+                                <th>Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in expense_data %}
+                            <tr>
+                                <td>{{ record.date.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ record.category }}</span>
+                                </td>
+                                <td>{{ record.description }}</td>
+                                <td>₹{{ "{:,.2f}".format(record.amount) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category-wise Expense Breakdown -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Expense Breakdown by Category</h5>
+                <div class="row">
+                    <div class="col-md-8">
+                        <canvas id="expenseChart"></canvas>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Category</th>
+                                        <th>Amount</th>
+                                        <th>%</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for category in expense_categories %}
+                                    <tr>
+                                        <td>{{ category.name }}</td>
+                                        <td>₹{{ "{:,.2f}".format(category.amount) }}</td>
+                                        <td>{{ "{:.1f}".format(category.percentage) }}%</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Get data from template
+    const chartData = {
+        dates: JSON.parse('{{ dates|tojson|safe }}'),
+        dailyIncome: JSON.parse('{{ daily_income|tojson|safe }}'),
+        dailyExpenses: JSON.parse('{{ daily_expenses|tojson|safe }}'),
+        expenseCategories: JSON.parse('{{ expense_categories|map(attribute="name")|list|tojson|safe }}'),
+        expenseAmounts: JSON.parse('{{ expense_categories|map(attribute="amount")|list|tojson|safe }}')
+    };
+
+    // Financial Overview Chart
+    const ctx = document.getElementById('financialChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartData.dates,
+            datasets: [{
+                label: 'Income',
+                data: chartData.dailyIncome,
+                borderColor: '#28a745',
+                tension: 0.4,
+                fill: false
+            }, {
+                label: 'Expenses',
+                data: chartData.dailyExpenses,
+                borderColor: '#dc3545',
+                tension: 0.4,
+                fill: false
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top'
+                },
+                title: {
+                    display: true,
+                    text: 'Daily Income vs Expenses'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '₹' + value.toLocaleString();
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Expense Breakdown Chart
+    const expenseCtx = document.getElementById('expenseChart').getContext('2d');
+    new Chart(expenseCtx, {
+        type: 'doughnut',
+        data: {
+            labels: chartData.expenseCategories,
+            datasets: [{
+                data: chartData.expenseAmounts,
+                backgroundColor: [
+                    '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', 
+                    '#e74a3b', '#858796', '#5a5c69', '#476072'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'right'
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

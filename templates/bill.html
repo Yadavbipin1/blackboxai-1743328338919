@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block hero %}
+<div class="hero-section">
+    <div class="hero-overlay">
+        <div class="hero-text">
+            <h1 class="display-4">Bill Generation</h1>
+            <p class="lead">Generate and manage guest bills</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Bill Generation Form -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Generate Bill</h5>
+                <form method="POST" action="{{ url_for('bill', guest_id=guest.id) }}">
+                    <!-- Guest Information -->
+                    <div class="mb-4">
+                        <h6 class="mb-3">Guest Details</h6>
+                        <p class="mb-2"><strong>Name:</strong> {{ guest.full_name }}</p>
+                        <p class="mb-2"><strong>Room:</strong> {{ room.room_number }} ({{ room.room_type }})</p>
+                        <p class="mb-2"><strong>Rate:</strong> ₹{{ "{:,.2f}".format(room.price_per_month) }}/month</p>
+                        <p class="mb-2">
+                            <strong>Last Bill Date:</strong> 
+                            {% if guest.last_bill_date %}
+                                {{ guest.last_bill_date.strftime('%Y-%m-%d') }}
+                            {% else %}
+                                {{ guest.check_in_date.strftime('%Y-%m-%d') }}
+                            {% endif %}
+                        </p>
+                    </div>
+
+                    <!-- Bill Calculation -->
+                    <div class="mb-3">
+                        <label for="total_days" class="form-label">Total Days</label>
+                        <input type="number" 
+                               class="form-control" 
+                               id="total_days" 
+                               name="total_days" 
+                               value="{{ total_days }}"
+                               min="1"
+                               required>
+                        <div class="form-text">
+                            Auto-calculated from last bill date. Adjust if needed.
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="discount" class="form-label">Discount Amount (₹)</label>
+                        <input type="number" 
+                               class="form-control" 
+                               id="discount" 
+                               name="discount" 
+                               value="0"
+                               min="0"
+                               step="0.01">
+                    </div>
+
+                    <div class="mb-4">
+                        <h6>Bill Summary</h6>
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Daily Rate:</span>
+                                    <span>₹{{ "{:,.2f}".format(room.price_per_month / 30) }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Days × Rate:</span>
+                                    <span id="subtotal">₹{{ "{:,.2f}".format(total_amount + discount) }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Discount:</span>
+                                    <span id="discountDisplay">-₹0.00</span>
+                                </div>
+                                <hr>
+                                <div class="d-flex justify-content-between fw-bold">
+                                    <span>Total Amount:</span>
+                                    <span id="totalAmount">₹{{ "{:,.2f}".format(total_amount) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-file-invoice me-2"></i>Generate Bill
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Previous Bills -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Previous Bills</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Bill #</th>
+                                <th>Period</th>
+                                <th>Days</th>
+                                <th>Amount</th>
+                                <th>Generated Date</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for bill in guest.bills|sort(attribute='generated_date', reverse=true) %}
+                            <tr>
+                                <td>#{{ bill.id }}</td>
+                                <td>{{ bill.billing_month }}/{{ bill.billing_year }}</td>
+                                <td>{{ bill.total_days }}</td>
+                                <td>₹{{ "{:,.2f}".format(bill.total_amount) }}</td>
+                                <td>{{ bill.generated_date.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    {% set payment = bill.payments|first %}
+                                    {% if payment %}
+                                        {% if payment.payment_status == 'paid' %}
+                                        <span class="badge bg-success">Paid</span>
+                                        {% elif payment.payment_status == 'informed & pending' %}
+                                        <span class="badge bg-warning">Pending</span>
+                                        {% else %}
+                                        <span class="badge bg-info">Advance</span>
+                                        {% endif %}
+                                    {% else %}
+                                    <span class="badge bg-danger">Unpaid</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group">
+                                        {% if bill.pdf_path %}
+                                        <a href="{{ url_for('download_bill', filename=bill.pdf_path) }}" 
+                                           class="btn btn-sm btn-primary"
+                                           title="Download PDF">
+                                            <i class="fas fa-download"></i>
+                                        </a>
+                                        {% endif %}
+                                        <button type="button"
+                                                class="btn btn-sm btn-info text-white"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#billModal{{ bill.id }}"
+                                                title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+
+                                    <!-- Bill Details Modal -->
+                                    <div class="modal fade" id="billModal{{ bill.id }}" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Bill Details #{{ bill.id }}</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <div class="mb-3">
+                                                        <h6>Billing Information</h6>
+                                                        <p class="mb-2"><strong>Period:</strong> {{ bill.billing_month }}/{{ bill.billing_year }}</p>
+                                                        <p class="mb-2"><strong>Total Days:</strong> {{ bill.total_days }}</p>
+                                                        <p class="mb-2"><strong>Room Rate:</strong> ₹{{ "{:,.2f}".format(room.price_per_month) }}/month</p>
+                                                        <p class="mb-2"><strong>Discount:</strong> ₹{{ "{:,.2f}".format(bill.discount) }}</p>
+                                                        <p class="mb-2"><strong>Total Amount:</strong> ₹{{ "{:,.2f}".format(bill.total_amount) }}</p>
+                                                    </div>
+
+                                                    <div class="mb-3">
+                                                        <h6>Payment Status</h6>
+                                                        {% set payment = bill.payments|first %}
+                                                        {% if payment %}
+                                                        <p class="mb-2"><strong>Status:</strong> {{ payment.payment_status }}</p>
+                                                        <p class="mb-2"><strong>Payment Date:</strong> {{ payment.date.strftime('%Y-%m-%d') }}</p>
+                                                        {% else %}
+                                                        <p class="text-danger">No payment recorded</p>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const totalDaysInput = document.getElementById('total_days');
+    const discountInput = document.getElementById('discount');
+    const subtotalDisplay = document.getElementById('subtotal');
+    const discountDisplay = document.getElementById('discountDisplay');
+    const totalAmountDisplay = document.getElementById('totalAmount');
+    
+    const dailyRate = parseFloat("{{ (room.price_per_month / 30)|round(2) }}");
+    
+    function updateBillCalculation() {
+        const days = parseInt(totalDaysInput.value) || 0;
+        const discount = parseFloat(discountInput.value) || 0;
+        
+        const subtotal = days * dailyRate;
+        const total = subtotal - discount;
+        
+        subtotalDisplay.textContent = `₹${subtotal.toLocaleString('en-IN', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        })}`;
+        
+        discountDisplay.textContent = `-₹${discount.toLocaleString('en-IN', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        })}`;
+        
+        totalAmountDisplay.textContent = `₹${total.toLocaleString('en-IN', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        })}`;
+    }
+    
+    totalDaysInput.addEventListener('input', updateBillCalculation);
+    discountInput.addEventListener('input', updateBillCalculation);
+    
+    // Form validation
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function(event) {
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        form.classList.add('was-validated');
+    });
+});
+</script>
+{% endblock %}

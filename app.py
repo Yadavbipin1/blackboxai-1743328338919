@@ -18,8 +18,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize Flask app
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='', static_folder='static')
 app.config.from_object(Config)
+
+# Create static folder if it doesn't exist
+if not os.path.exists('static'):
+    os.makedirs('static')
 
 # Initialize database
 init_db(app)
@@ -136,29 +140,34 @@ def guests():
 @app.route('/rooms', methods=['GET', 'POST'])
 def rooms():
     """Room management route"""
-    if request.method == 'POST':
-        try:
-            # Create new room
-            new_room = Room(
-                room_number=request.form['room_number'],
-                room_type=request.form['room_type'],
-                occupancy=bool(request.form.get('occupancy', False))
-            )
+    try:
+        if request.method == 'POST':
+            try:
+                # Create new room
+                new_room = Room(
+                    room_number=request.form['room_number'],
+                    room_type=request.form['room_type'],
+                    occupancy=bool(request.form.get('occupancy', False))
+                )
+                
+                db.session.add(new_room)
+                db.session.commit()
+                
+                flash("Room added successfully!", "success")
+                return redirect(url_for('rooms'))
             
-            db.session.add(new_room)
-            db.session.commit()
-            
-            flash("Room added successfully!", "success")
-            return redirect(url_for('rooms'))
+            except Exception as e:
+                logger.error(f"Error adding room: {str(e)}")
+                db.session.rollback()
+                flash("Error adding room. Please try again.", "error")
         
-        except Exception as e:
-            logger.error(f"Error adding room: {str(e)}")
-            db.session.rollback()
-            flash("Error adding room. Please try again.", "error")
-    
-    # Get all rooms for display
-    rooms_list = Room.query.all()
-    return render_template('rooms.html', rooms=rooms_list)
+        # Get all rooms for display
+        rooms_list = Room.query.all()
+        return render_template('rooms.html', rooms=rooms_list)
+    except Exception as e:
+        logger.error(f"Error in rooms route: {str(e)}")
+        flash("An error occurred while loading rooms.", "error")
+        return render_template('rooms.html', rooms=[])
 
 @app.route('/bill/<int:guest_id>', methods=['GET', 'POST'])
 def bill(guest_id):

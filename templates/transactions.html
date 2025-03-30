@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block hero %}
+<div class="hero-section">
+    <div class="hero-overlay">
+        <div class="hero-text">
+            <h1 class="display-4">Financial Transactions</h1>
+            <p class="lead">Manage payments and expenses</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Transaction Forms -->
+    <div class="col-md-4">
+        <!-- Payment Form -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Record Payment</h5>
+                <form method="POST" action="{{ url_for('transactions') }}">
+                    <input type="hidden" name="payment_submit" value="1">
+                    
+                    <div class="mb-3">
+                        <label for="guest_id" class="form-label">Guest</label>
+                        <select class="form-select" id="guest_id" name="guest_id" required>
+                            <option value="">Select guest</option>
+                            {% for guest in guests %}
+                            <option value="{{ guest.id }}">
+                                {{ guest.full_name }} (Room: {{ guest.room.room_number }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="amount" class="form-label">Amount (₹)</label>
+                        <input type="number" 
+                               class="form-control" 
+                               id="amount" 
+                               name="amount" 
+                               step="0.01" 
+                               required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="payment_status" class="form-label">Payment Status</label>
+                        <select class="form-select" id="payment_status" name="payment_status" required>
+                            <option value="informed & pending">Informed & Pending</option>
+                            <option value="paid">Paid</option>
+                            <option value="advance">Advance</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="bill_id" class="form-label">Associated Bill (Optional)</label>
+                        <select class="form-select" id="bill_id" name="bill_id">
+                            <option value="">Select bill</option>
+                            <!-- Bills will be populated via JavaScript when guest is selected -->
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-money-bill-wave me-2"></i>Record Payment
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Expense Form -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Record Expense</h5>
+                <form method="POST" action="{{ url_for('transactions') }}">
+                    <input type="hidden" name="expense_submit" value="1">
+                    
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Category</label>
+                        <select class="form-select" id="category" name="category" required>
+                            <option value="">Select category</option>
+                            <option value="food">Food</option>
+                            <option value="vegetables">Vegetables</option>
+                            <option value="snacks">Snacks</option>
+                            <option value="milk">Milk</option>
+                            <option value="electricity">Electricity</option>
+                            <option value="salary">Salary</option>
+                            <option value="water">Water</option>
+                            <option value="meat">Meat</option>
+                            <option value="essentials">Essentials</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description/Remarks</label>
+                        <textarea class="form-control" 
+                                  id="description" 
+                                  name="description" 
+                                  rows="3" 
+                                  required></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="expense_amount" class="form-label">Amount (₹)</label>
+                        <input type="number" 
+                               class="form-control" 
+                               id="expense_amount" 
+                               name="amount" 
+                               step="0.01" 
+                               required>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-danger w-100">
+                        <i class="fas fa-receipt me-2"></i>Record Expense
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Transaction History -->
+    <div class="col-md-8">
+        <!-- Transaction Filters -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-2">
+                        <select class="form-select" id="transactionType">
+                            <option value="all">All Transactions</option>
+                            <option value="payment">Payments Only</option>
+                            <option value="expense">Expenses Only</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <input type="month" class="form-control" id="monthFilter">
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <button class="btn btn-primary w-100" id="filterButton">
+                            <i class="fas fa-filter me-2"></i>Apply Filters
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Payments Table -->
+        <div class="card mb-4" id="paymentsSection">
+            <div class="card-body">
+                <h5 class="card-title">Payment History</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Guest</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Associated Bill</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for payment in payments %}
+                            <tr>
+                                <td>{{ payment.date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>{{ payment.guest.full_name }}</td>
+                                <td>₹{{ "{:,.2f}".format(payment.amount) }}</td>
+                                <td>
+                                    {% if payment.payment_status == 'paid' %}
+                                    <span class="badge bg-success">Paid</span>
+                                    {% elif payment.payment_status == 'informed & pending' %}
+                                    <span class="badge bg-warning">Pending</span>
+                                    {% else %}
+                                    <span class="badge bg-info">Advance</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if payment.bill %}
+                                    <a href="{{ url_for('bill', guest_id=payment.guest_id) }}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        View Bill #{{ payment.bill.id }}
+                                    </a>
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Expenses Table -->
+        <div class="card" id="expensesSection">
+            <div class="card-body">
+                <h5 class="card-title">Expense History</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Category</th>
+                                <th>Description</th>
+                                <th>Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for expense in expenses %}
+                            <tr>
+                                <td>{{ expense.date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ expense.category }}</span>
+                                </td>
+                                <td>{{ expense.description }}</td>
+                                <td>₹{{ "{:,.2f}".format(expense.amount) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize date filter with current month
+    const currentDate = new Date().toISOString().slice(0, 7);
+    document.getElementById('monthFilter').value = currentDate;
+    
+    // Transaction type filter
+    const transactionType = document.getElementById('transactionType');
+    const paymentsSection = document.getElementById('paymentsSection');
+    const expensesSection = document.getElementById('expensesSection');
+    
+    function filterTransactions() {
+        const selectedType = transactionType.value;
+        
+        if (selectedType === 'all') {
+            paymentsSection.style.display = '';
+            expensesSection.style.display = '';
+        } else if (selectedType === 'payment') {
+            paymentsSection.style.display = '';
+            expensesSection.style.display = 'none';
+        } else {
+            paymentsSection.style.display = 'none';
+            expensesSection.style.display = '';
+        }
+    }
+    
+    transactionType.addEventListener('change', filterTransactions);
+    
+    // Guest selection and bill population
+    const guestSelect = document.getElementById('guest_id');
+    const billSelect = document.getElementById('bill_id');
+    
+    guestSelect.addEventListener('change', function() {
+        const guestId = this.value;
+        if (guestId) {
+            // Fetch bills for selected guest via AJAX
+            fetch(`/api/guest/${guestId}/bills`)
+                .then(response => response.json())
+                .then(bills => {
+                    billSelect.innerHTML = '<option value="">Select bill</option>';
+                    bills.forEach(bill => {
+                        const option = document.createElement('option');
+                        option.value = bill.id;
+                        option.textContent = `Bill #${bill.id} (₹${bill.total_amount})`;
+                        billSelect.appendChild(option);
+                    });
+                })
+                .catch(error => console.error('Error fetching bills:', error));
+        } else {
+            billSelect.innerHTML = '<option value="">Select bill</option>';
+        }
+    });
+    
+    // Form validation
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+        form.addEventListener('submit', function(event) {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            form.classList.add('was-validated');
+        });
+    });
+});
+</script>
+{% endblock %}

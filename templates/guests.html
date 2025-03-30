@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block hero %}
+<div class="hero-section">
+    <div class="hero-overlay">
+        <div class="hero-text">
+            <h1 class="display-4">Guest Management</h1>
+            <p class="lead">Add and manage hostel guests</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Add New Guest Form -->
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Add New Guest</h5>
+                <form method="POST" action="{{ url_for('guests') }}">
+                    <div class="mb-3">
+                        <label for="full_name" class="form-label">Full Name</label>
+                        <input type="text" class="form-control" id="full_name" name="full_name" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="citizen_number" class="form-label">Citizen Number</label>
+                        <input type="text" class="form-control" id="citizen_number" name="citizen_number" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="emergency_contact" class="form-label">Emergency Contact</label>
+                        <input type="tel" class="form-control" id="emergency_contact" name="emergency_contact" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="address" class="form-label">Address</label>
+                        <textarea class="form-control" id="address" name="address" rows="3" required></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="date_of_birth" class="form-label">Date of Birth</label>
+                        <input type="date" class="form-control" id="date_of_birth" name="date_of_birth" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Food Preference</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="food_preference" id="veg" value="veg" required>
+                            <label class="form-check-label" for="veg">
+                                Vegetarian
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="food_preference" id="non-veg" value="non-veg">
+                            <label class="form-check-label" for="non-veg">
+                                Non-Vegetarian
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="check_in_date" class="form-label">Check-in Date</label>
+                        <input type="date" class="form-control" id="check_in_date" name="check_in_date" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="room_id" class="form-label">Room</label>
+                        <select class="form-select" id="room_id" name="room_id" required>
+                            <option value="">Select a room</option>
+                            {% for room in available_rooms %}
+                            <option value="{{ room.id }}">
+                                {{ room.room_number }} ({{ room.room_type }} - ₹{{ room.price_per_month }}/month)
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-user-plus me-2"></i>Add Guest
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Guest List -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Guest List</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Room</th>
+                                <th>Check-in Date</th>
+                                <th>Food Pref.</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for guest in guests %}
+                            <tr>
+                                <td>{{ guest.full_name }}</td>
+                                <td>{{ guest.room.room_number }}</td>
+                                <td>{{ guest.check_in_date.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    {% if guest.food_preference == 'veg' %}
+                                    <span class="badge bg-success">Veg</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Non-Veg</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% set latest_payment = guest.payments|sort(attribute='date')|last %}
+                                    {% if latest_payment %}
+                                        {% if latest_payment.payment_status == 'paid' %}
+                                        <span class="badge bg-success">Paid</span>
+                                        {% elif latest_payment.payment_status == 'informed & pending' %}
+                                        <span class="badge bg-warning">Pending</span>
+                                        {% else %}
+                                        <span class="badge bg-info">Advance</span>
+                                        {% endif %}
+                                    {% else %}
+                                    <span class="badge bg-secondary">No Payment</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="{{ url_for('bill', guest_id=guest.id) }}" 
+                                           class="btn btn-sm btn-primary" 
+                                           title="Generate Bill">
+                                            <i class="fas fa-file-invoice"></i>
+                                        </a>
+                                        <button type="button" 
+                                                class="btn btn-sm btn-info text-white" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#guestModal{{ guest.id }}"
+                                                title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <a href="{{ url_for('edit_guest', guest_id=guest.id) }}" 
+                                           class="btn btn-sm btn-warning" 
+                                           title="Edit Guest">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    </div>
+                                    
+                                    <!-- Guest Details Modal -->
+                                    <div class="modal fade" id="guestModal{{ guest.id }}" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Guest Details</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <p><strong>Name:</strong> {{ guest.full_name }}</p>
+                                                    <p><strong>Citizen Number:</strong> {{ guest.citizen_number }}</p>
+                                                    <p><strong>Email:</strong> {{ guest.email }}</p>
+                                                    <p><strong>Emergency Contact:</strong> {{ guest.emergency_contact }}</p>
+                                                    <p><strong>Address:</strong> {{ guest.address }}</p>
+                                                    <p><strong>Date of Birth:</strong> {{ guest.date_of_birth.strftime('%Y-%m-%d') }}</p>
+                                                    <p><strong>Food Preference:</strong> {{ guest.food_preference }}</p>
+                                                    <p><strong>Check-in Date:</strong> {{ guest.check_in_date.strftime('%Y-%m-%d') }}</p>
+                                                    <p><strong>Room:</strong> {{ guest.room.room_number }} ({{ guest.room.room_type }})</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize date inputs with today's date
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('check_in_date').value = today;
+    
+    // Form validation
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function(event) {
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        form.classList.add('was-validated');
+    });
+});
+</script>
+{% endblock %}
